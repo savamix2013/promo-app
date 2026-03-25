@@ -12,6 +12,7 @@ services:
       - PORT=3111
     volumes:
       - ./backend:/app
+      - ./frontend:/frontend
       - /app/node_modules
     restart: unless-stopped
     networks:
