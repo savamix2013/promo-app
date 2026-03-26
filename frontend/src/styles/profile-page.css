@@ -1,0 +1,87 @@
+.profile-page {
+  max-width: 600px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.profile-section,
+.saved-promos {
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  margin-bottom: 20px;
+}
+
+.profile-section h2,
+.saved-promos h3 {
+  font-size: 22px;
+  margin-bottom: 20px;
+  color: #333;
+}
+
+.profile-info {
+  margin-bottom: 20px;
+}
+
+.profile-info p {
+  font-size: 16px;
+  margin: 12px 0;
+  padding: 10px;
+  background-color: #f9f9f9;
+  border-left: 3px solid #667eea;
+  border-radius: 4px;
+}
+
+.edit-button {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 12px 24px;
+  font-size: 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.edit-button:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.saved-list {
+  list-style: none;
+  padding: 0;
+}
+
+.saved-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  border-bottom: 1px solid #eee;
+  font-size: 14px;
+}
+
+.saved-list li:last-child {
+  border-bottom: none;
+}
+
+.shop-badge {
+  background-color: #667eea;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+@media (max-width: 480px) {
+  .profile-section,
+  .saved-promos {
+    padding: 15px;
+  }
+
+  .profile-info p {
+    font-size: 14px;
+  }
+}
