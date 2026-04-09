@@ -17,7 +17,7 @@ async function initDatabase() {
   try {
     await sequelize.authenticate();
     console.log("Database connected");
-    await sequelize.sync();
+    // await sequelize.sync();
     console.log("Database synchronized");
   } catch (error) {
     console.error("Database error:", error.message);
