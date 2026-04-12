@@ -2,7 +2,7 @@
   "name": "backend",
   "main": "app.js",
   "scripts": {
-    "start": "node app.js"
+    "start": "./node_modules/.bin/knex migrate:latest && node app.js"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",
