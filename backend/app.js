@@ -4,14 +4,16 @@ const path = require("path");
 const sequelize = require("./config/database");
 const User = require("./models/user");
 const checkAuth = require("./middleware/auth");
+const authRoutes = require("./routes/auth");
+const promosRoutes = require("./routes/promos");
 
 const app = express();
 const port = process.env.PORT || 3111;
 
 app.use(express.json());
 app.use(express.static("/frontend"));
-const authRoutes = require("./routes/auth");
 app.use("/auth", authRoutes);
+app.use("/promos", promosRoutes);
 
 async function initDatabase() {
   try {
