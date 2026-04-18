@@ -1,8 +1,8 @@
 const express = require("express");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
-const User = require("../models/user");
 const checkAuth = require("../middleware/auth");
+const knex = require("knex")(require("../knexfile").development);
 
 const router = express.Router();
 
@@ -12,7 +12,7 @@ router.post("/register", async (req, res) => {
     const email = req.body.email;
     const password = req.body.password;
 
-    const oldUser = await User.findOne({ where: { email: email } });
+    const oldUser = await knex("users").where({ email }).first();
     if (oldUser) {
       return res.status(400).json({ error: "Така пошта вже є" });
     }
@@ -20,13 +20,14 @@ router.post("/register", async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const hash = await bcrypt.hash(password, salt);
 
-    const newUser = await User.create({
-      name: name,
-      email: email,
+    const ids = await knex("users").insert({
+      name,
+      email,
       password_hash: hash,
       role: "user",
     });
 
+    const newUser = await knex("users").where({ id: ids[0] }).first();
     res.status(201).json({ success: true, data: newUser });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -38,7 +39,7 @@ router.post("/login", async (req, res) => {
     const email = req.body.email;
     const password = req.body.password;
 
-    const user = await User.findOne({ where: { email: email } });
+    const user = await knex("users").where({ email }).first();
     if (!user) {
       return res.status(400).json({ error: "Користувача не знайдено" });
     }
@@ -62,7 +63,7 @@ router.post("/login", async (req, res) => {
 
 router.get("/me", checkAuth, async (req, res) => {
   try {
-    const user = await User.findByPk(req.user.id);
+    const user = await knex("users").where({ id: req.user.id }).first();
 
     if (!user) {
       return res.status(404).json({ error: "Користувача не знайдено" });
