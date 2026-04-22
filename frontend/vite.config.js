@@ -6,7 +6,6 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: true,
-    // use esbuild minifier to avoid optional terser dependency
     minify: 'esbuild',
     rollupOptions: {
       output: {
@@ -19,10 +18,8 @@ export default defineConfig({
   server: {
     port: 3000,
     proxy: {
-      '/': {
-        target: 'http://localhost:3111',
-        changeOrigin: true,
-      },
+      '/auth': 'http://localhost:3111',
+      '/promos': 'http://localhost:3111',
     },
   },
 });
