@@ -1,81 +1,82 @@
-import { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import PromoCard from '../components/PromoCard';
+
 import '../styles/home-page.css';
 
-function HomePage() {
-  const [promos, setPromos] = useState([
-    {
-      id: 1,
-      title: 'Знижка на молоко',
-      shop: 'Сільпо',
-      discount: 30,
-      price: '45',
-      expiresAt: '31.03.2026',
-    },
-    {
-      id: 2,
-      title: 'Пакет соків (6 шт)',
-      shop: 'АТБ',
-      discount: 25,
-      price: '89 ',
-      expiresAt: '30.03.2026',
-    },
-    {
-      id: 3,
-      title: 'Хлібобулочні вироби',
-      shop: 'Novus',
-      discount: 15,
-      price: '12 ',
-      expiresAt: '29.03.2026',
-    },
-  ]);
+const HomePage = () => {
+  const [promos, setPromos] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedStore, setSelectedStore] = useState('All');
 
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedShop, setSelectedShop] = useState('all');
+  useEffect(() => {
+    const fetchPromos = async () => {
+      setLoading(true);
+      try {
+        const url =
+          selectedStore && selectedStore !== 'All'
+            ? `/promos?store=${selectedStore}`
+            : '/promos';
 
-  const filteredPromos = promos.filter(
-    promo =>
-      promo.title.toLowerCase().includes(searchQuery.toLowerCase()) &&
-      (selectedShop === 'all' || promo.shop === selectedShop),
-  );
+        const response = await axios.get(url);
+
+        console.log('Відповідь від сервера:', response.data);
+
+        // Безпечно перевіряємо, де саме лежить масив акцій
+        if (Array.isArray(response.data)) {
+          setPromos(response.data);
+        } else if (response.data.data && Array.isArray(response.data.data)) {
+          setPromos(response.data.data);
+        } else if (
+          response.data.promos &&
+          Array.isArray(response.data.promos)
+        ) {
+          setPromos(response.data.promos);
+        } else {
+          console.warn('Не знайшли масив акцій у відповіді:', response.data);
+          setPromos([]);
+        }
+      } catch (error) {
+        console.error('Помилка при завантаженні даних:', error);
+        setPromos([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchPromos();
+  }, [selectedStore]);
 
   return (
-    <div className="home-page">
-      <section className="hero">
-        <h2>Знайди найкращі акції у своєму місті</h2>
-        <p>Економія починається тут</p>
-      </section>
-
-      <section className="filters">
-        <input
-          type="text"
-          placeholder="🔍 Пошук акцій..."
-          value={searchQuery}
-          onChange={e => setSearchQuery(e.target.value)}
-          className="search-input"
-        />
-
+    <div>
+      {/* Селект для фільтрації по магазинах */}
+      <div style={{ marginBottom: '20px', padding: '10px' }}>
+        <label style={{ marginRight: '10px' }}>Виберіть магазин: </label>
         <select
-          value={selectedShop}
-          onChange={e => setSelectedShop(e.target.value)}
-          className="shop-filter"
+          value={selectedStore}
+          onChange={e => setSelectedStore(e.target.value)}
+          style={{ padding: '5px', borderRadius: '5px' }}
         >
-          <option value="all">Усі магазини</option>
-          <option value="Сільпо">Сільпо</option>
-          <option value="АТБ">АТБ</option>
-          <option value="Novus">Novus</option>
+          <option value="All">Всі</option>
+          <option value="ATB">ATB</option>
+          <option value="Silpo">Сільпо</option>
         </select>
-      </section>
+      </div>
 
-      <section className="promos-grid">
-        {filteredPromos.length > 0 ? (
-          filteredPromos.map(promo => <PromoCard key={promo.id} {...promo} />)
+      {/* Контейнер з карточками */}
+      <div className="promos-container">
+        {loading ? (
+          <p>Завантаження акцій...</p>
+        ) : promos.length === 0 ? (
+          <p>Акції не знайдено</p>
         ) : (
-          <p className="no-promos">Акції не знайдені 😞</p>
+          promos.map(promo => (
+            <PromoCard key={promo.id || promo.url} promo={promo} />
+          ))
         )}
-      </section>
+      </div>
     </div>
   );
-}
+};
 
 export default HomePage;
