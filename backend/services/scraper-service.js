@@ -1,4 +1,4 @@
-const knex = require("knex")(require("../knexfile").development);
+const knex = require("../db");
 
 async function runScraper(scrapeFn) {
   const stats = { inserted: 0, updated: 0, skipped: 0, errors: [] };

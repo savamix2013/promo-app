@@ -3,19 +3,20 @@ const express = require("express");
 const checkAuth = require("./middleware/auth");
 const authRoutes = require("./routes/auth");
 const promosRoutes = require("./routes/promos");
-const knex = require("knex")(require("./knexfile").development);
+const knex = require("./db");
 
 const app = express();
 const port = process.env.PORT || 3111;
+const path = require("path")
 
 app.use(express.json());
-app.use(express.static("/frontend"));
+app.use(express.static(path.join(__dirname, "../frontend/dist")));
 app.use("/auth", authRoutes);
 app.use("/promos", promosRoutes);
 
 app.get("/users", checkAuth, async (req, res) => {
   try {
-    const users = await knex("users");
+    const users = await knex("users").select("id", "name", "email", "role");
     res.json({ success: true, data: users });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });

@@ -2,7 +2,7 @@ const express = require("express");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const checkAuth = require("../middleware/auth");
-const knex = require("knex")(require("../knexfile").development);
+const knex = require("../db");
 
 const router = express.Router();
 
@@ -28,7 +28,15 @@ router.post("/register", async (req, res) => {
     });
 
     const newUser = await knex("users").where({ id: ids[0] }).first();
-    res.status(201).json({ success: true, data: newUser });
+    res.status(201).json({
+      success: true,
+      data: {
+        id: newUser.id,
+        name: newUser.name,
+        email: newUser.email,
+        role: newUser.role,
+      },
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
