@@ -64,4 +64,53 @@ router.post("/scrape/:store", checkAuth, async (req, res) => {
   }
 });
 
+router.get("/:id", async (req, res) => {
+  try {
+    const promo = await knex("promos").where({ id: req.params.id }).first();
+    if (!promo) {
+      return res.status(404).json({ error: "Акцію не знайдено" });
+    }
+    res.json({ success: true, data: promo });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.put("/:id", checkAuth, async (req, res) => {
+  try {
+    const data = {
+      title: req.body.title,
+      store: req.body.store,
+      old_price: req.body.old_price,
+      new_price: req.body.new_price,
+      discount_percent: req.body.discount_percent,
+      image_url: req.body.image_url,
+      url: req.body.url,
+      category: req.body.category,
+      starts_at: req.body.starts_at,
+      ends_at: req.body.ends_at,
+    };
+    const count = await knex("promos").where({ id: req.params.id }).update(data);
+    if (count === 0) {
+      return res.status(404).json({ error: "Акцію не знайдено" });
+    }
+    const promo = await knex("promos").where({ id: req.params.id }).first();
+    res.json({ success: true, data: promo });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+router.delete("/:id", checkAuth, async (req, res) => {
+  try {
+    const count = await knex("promos").where({ id: req.params.id }).del();
+    if (count === 0) {
+      return res.status(404).json({ error: "Акцію не знайдено" });
+    }
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;
