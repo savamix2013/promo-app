@@ -24,7 +24,19 @@ router.get("/", async (req, res) => {
 
 router.post("/", checkAuth, async (req, res) => {
   try {
-    const ids = await knex("promos").insert(req.body);
+    const data = {
+      title: req.body.title,
+      store: req.body.store,
+      old_price: req.body.old_price,
+      new_price: req.body.new_price,
+      discount_percent: req.body.discount_percent,
+      image_url: req.body.image_url,
+      url: req.body.url,
+      category: req.body.category,
+      starts_at: req.body.starts_at,
+      ends_at: req.body.ends_at,
+    };
+    const ids = await knex("promos").insert(data);
     const promo = await knex("promos").where("id", ids[0]).first();
     res.status(201).json({ success: true, data: promo });
   } catch (error) {
