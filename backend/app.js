@@ -7,9 +7,10 @@ const knex = require("./db");
 
 const app = express();
 const port = process.env.PORT || 3111;
+const path = require("path")
 
 app.use(express.json());
-app.use(express.static("/frontend"));
+app.use(express.static(path.join(__dirname, "../frontend/dist")));
 app.use("/auth", authRoutes);
 app.use("/promos", promosRoutes);
 
