@@ -16,7 +16,7 @@ app.use("/promos", promosRoutes);
 
 app.get("/users", checkAuth, async (req, res) => {
   try {
-    const users = await knex("users");
+    const users = await knex("users").select("id", "name", "email", "role");
     res.json({ success: true, data: users });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
