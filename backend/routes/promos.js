@@ -9,12 +9,23 @@ const router = express.Router();
 router.get("/", async (req, res) => {
   try {
     const store = req.query.store;
+    const category = req.query.category;
+    const search = req.query.search;
+    
     const query = knex("promos").orderBy("discount_percent", "desc");
 
     if (store) {
       query.where("store", store);
     }
 
+    if (category) {
+      query.where("category", category);
+    }
+    
+    if (search) {
+      query.where("title", "like", "%" + search + "%");
+    }
+    
     const promos = await query;
     res.json({ success: true, data: promos });
   } catch (error) {
@@ -61,6 +72,26 @@ router.post("/scrape/:store", checkAuth, async (req, res) => {
     res.status(status).json({ success: true, data: stats });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+router.get("/stores", async (req, res) => {
+  try {
+    const rows = await knex("promos").distinct("store");
+    const stores = rows.map(row => row.store);
+    res.json({ success: true, data: stores });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get("/categories", async (req, res) => {
+  try {
+    const rows = await knex("promos").distinct("category").whereNotNull("category");
+    const categories = rows.map((row) => row.category);
+    res.json({ success: true, data: categories });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 });
 
