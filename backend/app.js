@@ -23,6 +23,26 @@ app.get("/users", checkAuth, async (req, res) => {
   }
 });
 
+app.delete("/users/:id", checkAuth, async (req, res) => {
+  try {
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ error: "Лише для адміністраторів" });
+    }
+
+    if (Number(req.params.id) === req.user.id) {
+      return res.status(400).json({ error: "Не можна видалити себе" });
+    }
+
+    const count = await knex("users").where({ id: req.params.id }).del();
+    if (count === 0) {
+      return res.status(404).json({ error: "Користувача не знайдено" });
+    }
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 app.listen(port, () => {
   console.log(`Server started in http://localhost:${port}`);
 });

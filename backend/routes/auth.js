@@ -91,4 +91,70 @@ router.get("/me", checkAuth, async (req, res) => {
   }
 });
 
+router.put("/profile", checkAuth, async (req, res) => {
+  try {
+    const name = req.body.name;
+    const email = req.body.email;
+
+    if (email) {
+      const existing = await knex("users")
+        .where({ email })
+        .whereNot({ id: req.user.id })
+        .first();
+      if (existing) {
+        return res.status(400).json({ error: "Така пошта вже зайнята" });
+      }
+    }
+
+    const data = {};
+    if (name) data.name = name;
+    if (email) data.email = email;
+
+    await knex("users").where({ id: req.user.id }).update(data);
+    const user = await knex("users").where({ id: req.user.id }).first();
+
+    res.json({
+      success: true,
+      data: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.put("/password", checkAuth, async (req, res) => {
+  try {
+    const oldPassword = req.body.old_password;
+    const newPassword = req.body.new_password;
+
+    const user = await knex("users").where({ id: req.user.id }).first();
+    const isValid = await bcrypt.compare(oldPassword, user.password_hash);
+    if (!isValid) {
+      return res.status(400).json({ error: "Старий пароль невірний" });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const hash = await bcrypt.hash(newPassword, salt);
+
+    await knex("users").where({ id: req.user.id }).update({ password_hash: hash });
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.delete("/account", checkAuth, async (req, res) => {
+  try {
+    await knex("users").where({ id: req.user.id }).del();
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;
