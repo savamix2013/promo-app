@@ -1,33 +1,35 @@
 const express = require("express");
 const bcrypt = require("bcrypt");
-const jwt = require("jsonwebtoken");
-const checkAuth = require("../middleware/auth");
-const knex = require("../db");
+const jsonWebToken = require("jsonwebtoken");
+const checkAuthentication = require("../middleware/auth");
+const database = require("../db");
 
 const router = express.Router();
 
-router.post("/register", async (req, res) => {
+router.post("/register", async function (req, res) {
   try {
     const name = req.body.name;
     const email = req.body.email;
     const password = req.body.password;
 
-    const oldUser = await knex("users").where({ email }).first();
-    if (oldUser) {
+    const existingUser = await database("users").where({ email: email }).first();
+    if (existingUser) {
       return res.status(400).json({ error: "Така пошта вже є" });
     }
 
     const salt = await bcrypt.genSalt(10);
     const hash = await bcrypt.hash(password, salt);
 
-    const ids = await knex("users").insert({
-      name,
-      email,
+    const insertedIds = await database("users").insert({
+      name: name,
+      email: email,
       password_hash: hash,
       role: "user",
     });
 
-    const newUser = await knex("users").where({ id: ids[0] }).first();
+    const newUserId = insertedIds[0];
+    const newUser = await database("users").where({ id: newUserId }).first();
+
     res.status(201).json({
       success: true,
       data: {
@@ -37,41 +39,41 @@ router.post("/register", async (req, res) => {
         role: newUser.role,
       },
     });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
-router.post("/login", async (req, res) => {
+router.post("/login", async function (req, res) {
   try {
     const email = req.body.email;
     const password = req.body.password;
 
-    const user = await knex("users").where({ email }).first();
+    const user = await database("users").where({ email: email }).first();
     if (!user) {
       return res.status(400).json({ error: "Користувача не знайдено" });
     }
 
-    const isValid = await bcrypt.compare(password, user.password_hash);
-    if (!isValid) {
+    const isPasswordValid = await bcrypt.compare(password, user.password_hash);
+    if (!isPasswordValid) {
       return res.status(400).json({ error: "Неправильний пароль" });
     }
 
-    const token = jwt.sign(
+    const token = jsonWebToken.sign(
       { id: user.id, role: user.role },
       process.env.JWT_SECRET,
-      { expiresIn: "1h" },
+      { expiresIn: "1h" }
     );
 
     res.json({ success: true, token: token });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
-router.get("/me", checkAuth, async (req, res) => {
+router.get("/me", checkAuthentication, async function (req, res) {
   try {
-    const user = await knex("users").where({ id: req.user.id }).first();
+    const user = await database("users").where({ id: req.user.id }).first();
 
     if (!user) {
       return res.status(404).json({ error: "Користувача не знайдено" });
@@ -86,32 +88,36 @@ router.get("/me", checkAuth, async (req, res) => {
         role: user.role,
       },
     });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
-router.put("/profile", checkAuth, async (req, res) => {
+router.put("/profile", checkAuthentication, async function (req, res) {
   try {
     const name = req.body.name;
     const email = req.body.email;
 
     if (email) {
-      const existing = await knex("users")
-        .where({ email })
+      const existingUser = await database("users")
+        .where({ email: email })
         .whereNot({ id: req.user.id })
         .first();
-      if (existing) {
+      if (existingUser) {
         return res.status(400).json({ error: "Така пошта вже зайнята" });
       }
     }
 
-    const data = {};
-    if (name) data.name = name;
-    if (email) data.email = email;
+    const updateData = {};
+    if (name) {
+      updateData.name = name;
+    }
+    if (email) {
+      updateData.email = email;
+    }
 
-    await knex("users").where({ id: req.user.id }).update(data);
-    const user = await knex("users").where({ id: req.user.id }).first();
+    await database("users").where({ id: req.user.id }).update(updateData);
+    const user = await database("users").where({ id: req.user.id }).first();
 
     res.json({
       success: true,
@@ -122,38 +128,38 @@ router.put("/profile", checkAuth, async (req, res) => {
         role: user.role,
       },
     });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
-router.put("/password", checkAuth, async (req, res) => {
+router.put("/password", checkAuthentication, async function (req, res) {
   try {
     const oldPassword = req.body.old_password;
     const newPassword = req.body.new_password;
 
-    const user = await knex("users").where({ id: req.user.id }).first();
-    const isValid = await bcrypt.compare(oldPassword, user.password_hash);
-    if (!isValid) {
+    const user = await database("users").where({ id: req.user.id }).first();
+    const isPasswordValid = await bcrypt.compare(oldPassword, user.password_hash);
+    if (!isPasswordValid) {
       return res.status(400).json({ error: "Старий пароль невірний" });
     }
 
     const salt = await bcrypt.genSalt(10);
     const hash = await bcrypt.hash(newPassword, salt);
 
-    await knex("users").where({ id: req.user.id }).update({ password_hash: hash });
+    await database("users").where({ id: req.user.id }).update({ password_hash: hash });
     res.json({ success: true });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
-router.delete("/account", checkAuth, async (req, res) => {
+router.delete("/account", checkAuthentication, async function (req, res) {
   try {
-    await knex("users").where({ id: req.user.id }).del();
+    await database("users").where({ id: req.user.id }).del();
     res.json({ success: true });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 

@@ -1,5 +1,5 @@
-exports.up = async function (knex) {
-  await knex.schema.createTable("promos", (table) => {
+exports.up = async function (database) {
+  await database.schema.createTable("promos", function (table) {
     table.increments("id").primary();
     table.string("title").notNullable();
     table.string("store").notNullable();
@@ -14,6 +14,6 @@ exports.up = async function (knex) {
   });
 };
 
-exports.down = async function (knex) {
-  await knex.schema.dropTableIfExists("promos");
+exports.down = async function (database) {
+  await database.schema.dropTableIfExists("promos");
 };

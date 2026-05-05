@@ -1,27 +1,26 @@
-const jwt = require("jsonwebtoken");
+const jsonWebToken = require("jsonwebtoken");
 
-function checkAuth(req, res, next) {
-  const authHeader = req.headers.authorization;
+function checkAuthentication(req, res, nextFunction) {
+  const authorizationHeader = req.headers.authorization;
 
-  if (!authHeader) {
+  if (!authorizationHeader) {
     return res.status(401).json({ error: "Немає токена" });
   }
 
-  const token = authHeader.split(" ")[1];
+  const tokenParts = authorizationHeader.split(" ");
+  const token = tokenParts[1];
 
   if (!token) {
     return res.status(401).json({ error: "Токен порожній" });
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
-    req.user = decoded;
-
-    next();
-  } catch (error) {
+    const decodedToken = jsonWebToken.verify(token, process.env.JWT_SECRET);
+    req.user = decodedToken;
+    nextFunction();
+  } catch (err) {
     return res.status(401).json({ error: "Токен недійсний" });
   }
 }
 
-module.exports = checkAuth;
+module.exports = checkAuthentication;
