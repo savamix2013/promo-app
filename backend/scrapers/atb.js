@@ -1,177 +1,305 @@
-const { withBrowser, withRetry } = require("./base");
+const baseScraper = require("./base");
+const withBrowser = baseScraper.withBrowser;
+const withRetry = baseScraper.withRetry;
 
-const ATB_BASE = "https://www.atbmarket.com";
-const PROMO_URL = ATB_BASE + "/promo/all";
+const ATB_BASE_URL = "https://www.atbmarket.com";
+const PROMOTION_URL = ATB_BASE_URL + "/promo/all";
 
-const DELAY_MS = 2000;
+const DELAY_MILLISECONDS = 2000;
 
-async function scrapePromoList(page) {
-  await page.goto(PROMO_URL, { waitUntil: "networkidle2", timeout: 30000 });
+async function scrapePromotionList(page) {
+  await page.goto(PROMOTION_URL, { waitUntil: "networkidle2", timeout: 30000 });
   await page.waitForSelector(".actions-list__item", { timeout: 15000 });
 
-  const promos = await page.$$eval(".actions-list__item", (items) => {
-    return items.map((el) => {
-      const linkEl = el.querySelector("a.actions-list__img");
-      const titleEl = el.querySelector(".actions-list__title");
-      return {
-        title: titleEl ? titleEl.textContent.trim() : "Без назви",
-        path: linkEl ? linkEl.getAttribute("href") : null,
-      };
-    });
+  const promotions = await page.$$eval(".actions-list__item", function (items) {
+    const resultList =[];
+    for (let i = 0; i < items.length; i++) {
+      const element = items[i];
+      const linkElement = element.querySelector("a.actions-list__img");
+      const titleElement = element.querySelector(".actions-list__title");
+
+      let titleText;
+      if (titleElement) {
+        titleText = titleElement.textContent.trim();
+      } else {
+        titleText = "Без назви";
+      }
+
+      let pathText;
+      if (linkElement) {
+        pathText = linkElement.getAttribute("href");
+      } else {
+        pathText = null;
+      }
+
+      resultList.push({
+        title: titleText,
+        path: pathText,
+      });
+    }
+    return resultList;
   });
 
-  return promos.filter((c) => c.path);
+  const filteredPromotions =[];
+  for (let i = 0; i < promotions.length; i++) {
+    if (promotions[i].path) {
+      filteredPromotions.push(promotions[i]);
+    }
+  }
+  return filteredPromotions;
 }
 
 async function waitForCloudflare(page) {
   const title = await page.title();
-  if (!title.includes("moment") && !title.includes("Cloudflare")) {
-    return true;
+  if (title.indexOf("moment") === -1) {
+    if (title.indexOf("Cloudflare") === -1) {
+      return true;
+    }
   }
 
   console.warn("Cloudflare заблокував, чекаємо");
 
   for (let i = 0; i < 15; i++) {
-    await new Promise((r) => setTimeout(r, 1000));
+    await new Promise(function (resolve) {
+      setTimeout(resolve, 1000);
+    });
     const newTitle = await page.title();
-    if (!newTitle.includes("moment") && !newTitle.includes("Cloudflare")) {
-      return true;
+    if (newTitle.indexOf("moment") === -1) {
+      if (newTitle.indexOf("Cloudflare") === -1) {
+        return true;
+      }
     }
   }
 
   return false;
 }
 
-async function scrapePromoProducts(page, promoPath, promoTitle) {
-  const url = ATB_BASE + promoPath;
+async function scrapePromotionProducts(page, promotionPath, promotionTitle) {
+  const fullUrl = ATB_BASE_URL + promotionPath;
 
-  await page.goto(url, { waitUntil: "networkidle2", timeout: 45000 });
+  await page.goto(fullUrl, { waitUntil: "networkidle2", timeout: 45000 });
 
-  const passed = await waitForCloudflare(page);
-  if (!passed) {
-    console.warn("Cloudflare не пустив: " + url);
-    return [];
+  const passedCloudflare = await waitForCloudflare(page);
+  if (!passedCloudflare) {
+    console.warn("Cloudflare не пустив: " + fullUrl);
+    return[];
   }
 
-  const hasProducts = await page
-    .waitForSelector("article.catalog-item", { timeout: 10000 })
-    .then(() => true)
-    .catch(() => false);
+  let hasProducts;
+  try {
+    await page.waitForSelector("article.catalog-item", { timeout: 10000 });
+    hasProducts = true;
+  } catch (err) {
+    hasProducts = false;
+  }
 
   if (!hasProducts) {
-    console.warn("Немає товарів в акції: " + promoTitle);
-    return [];
+    console.warn("Немає товарів в акції: " + promotionTitle);
+    return[];
   }
 
-  const endDate = await page
-    .$eval(".actionsTimer[data-time]", (el) => el.getAttribute("data-time"))
-    .catch(() => null);
-
-  const products = await page.$$eval("article.catalog-item", (items) => {
-    return items.map((el) => {
-      const titleEl = el.querySelector(".catalog-item__title a");
-      const newPriceEl = el.querySelector(".product-price__top");
-      const oldPriceEl = el.querySelector(".product-price__bottom");
-      const imgEl = el.querySelector("img.catalog-item__img");
-
-      return {
-        name: titleEl ? titleEl.textContent.trim() : null,
-        path: titleEl ? titleEl.getAttribute("href") : null,
-        newPriceRaw: newPriceEl ? newPriceEl.getAttribute("value") : null,
-        oldPriceRaw: oldPriceEl ? oldPriceEl.getAttribute("value") : null,
-        imgSrc: imgEl ? imgEl.getAttribute("src") : null,
-      };
+  let endDateValue;
+  try {
+    endDateValue = await page.$eval(".actionsTimer[data-time]", function (element) {
+      return element.getAttribute("data-time");
     });
+  } catch (err) {
+    endDateValue = null;
+  }
+
+  const products = await page.$$eval("article.catalog-item", function (items) {
+    const resultList =[];
+    for (let i = 0; i < items.length; i++) {
+      const element = items[i];
+      const titleElement = element.querySelector(".catalog-item__title a");
+      const newPriceElement = element.querySelector(".product-price__top");
+      const oldPriceElement = element.querySelector(".product-price__bottom");
+      const imageElement = element.querySelector("img.catalog-item__img");
+
+      let nameText;
+      let pathText;
+      if (titleElement) {
+        nameText = titleElement.textContent.trim();
+        pathText = titleElement.getAttribute("href");
+      } else {
+        nameText = null;
+        pathText = null;
+      }
+
+      let newPriceText;
+      if (newPriceElement) {
+        newPriceText = newPriceElement.getAttribute("value");
+      } else {
+        newPriceText = null;
+      }
+
+      let oldPriceText;
+      if (oldPriceElement) {
+        oldPriceText = oldPriceElement.getAttribute("value");
+      } else {
+        oldPriceText = null;
+      }
+
+      let imageSource;
+      if (imageElement) {
+        imageSource = imageElement.getAttribute("src");
+      } else {
+        imageSource = null;
+      }
+
+      resultList.push({
+        name: nameText,
+        path: pathText,
+        newPriceRaw: newPriceText,
+        oldPriceRaw: oldPriceText,
+        imageSource: imageSource,
+      });
+    }
+    return resultList;
   });
 
-  return products.map((p) => ({
-    ...p,
-    promoTitle,
-    endDate,
-  }));
+  const productsWithPromotionData =[];
+  for (let i = 0; i < products.length; i++) {
+    const product = products[i];
+    product.promotionTitle = promotionTitle;
+    product.endDate = endDateValue;
+    productsWithPromotionData.push(product);
+  }
+
+  return productsWithPromotionData;
 }
 
 async function scrape() {
-  return withBrowser(async (page) => {
-    console.log("Завантаження акцій з " + PROMO_URL);
-    const promos = await withRetry(() => scrapePromoList(page));
-    console.log("Знайдено " + promos.length + " акцій");
+  return withBrowser(async function (page) {
+    console.log("Завантаження акцій з " + PROMOTION_URL);
+    const promotions = await withRetry(async function () {
+      return await scrapePromotionList(page);
+    });
+    console.log("Знайдено " + promotions.length + " акцій");
 
-    let allProducts = [];
+    let allProducts =[];
 
-    for (const promo of promos) {
-      console.log("Збираємо товари: " + promo.title);
+    for (let i = 0; i < promotions.length; i++) {
+      const promotion = promotions[i];
+      console.log("Збираємо товари: " + promotion.title);
 
       try {
-        const products = await withRetry(
-          () => scrapePromoProducts(page, promo.path, promo.title),
-          2,
-        );
+        const products = await withRetry(async function () {
+          return await scrapePromotionProducts(page, promotion.path, promotion.title);
+        }, 2);
         allProducts = allProducts.concat(products);
         console.log(products.length + " товарів");
       } catch (err) {
         console.warn("Помилка: " + err.message);
       }
 
-      await new Promise((r) => setTimeout(r, DELAY_MS));
+      await new Promise(function (resolve) {
+        setTimeout(resolve, DELAY_MILLISECONDS);
+      });
     }
 
-    const valid = allProducts.filter((p) => p.name && p.newPriceRaw);
-
-    const seen = new Map();
-    for (const p of valid) {
-      if (!seen.has(p.name)) {
-        seen.set(p.name, p);
+    const validProducts =[];
+    for (let i = 0; i < allProducts.length; i++) {
+      const product = allProducts[i];
+      if (product.name) {
+        if (product.newPriceRaw) {
+          validProducts.push(product);
+        }
       }
     }
-    const unique = Array.from(seen.values());
 
-    console.log("Всього валідних: " + valid.length + ", унікальних: " + unique.length);
+    const seenProducts = {};
+    const uniqueProducts =[];
+    for (let i = 0; i < validProducts.length; i++) {
+      const product = validProducts[i];
+      if (!seenProducts[product.name]) {
+        seenProducts[product.name] = true;
+        uniqueProducts.push(product);
+      }
+    }
 
-    return unique.map((p) => {
-      const newPrice = parsePrice(p.newPriceRaw);
-      const oldPrice = parsePrice(p.oldPriceRaw);
-      const endsAt = parseEndDate(p.endDate);
+    console.log("Всього валідних: " + validProducts.length + ", унікальних: " + uniqueProducts.length);
 
-      return {
-        title: p.name,
+    const finalProducts =[];
+    for (let i = 0; i < uniqueProducts.length; i++) {
+      const product = uniqueProducts[i];
+      const newPrice = parsePrice(product.newPriceRaw);
+      const oldPrice = parsePrice(product.oldPriceRaw);
+      const endsAt = parseEndDate(product.endDate);
+      const discountPercent = calculateDiscount(oldPrice, newPrice);
+
+      let urlValue;
+      if (product.path) {
+        urlValue = ATB_BASE_URL + product.path;
+      } else {
+        urlValue = null;
+      }
+
+      finalProducts.push({
+        title: product.name,
         store: "ATB",
         new_price: newPrice,
         old_price: oldPrice,
-        discount_percent: calcDiscount(oldPrice, newPrice),
-        image_url: makeFullUrl(p.imgSrc),
-        url: p.path ? ATB_BASE + p.path : null,
-        category: p.promoTitle,
+        discount_percent: discountPercent,
+        image_url: makeFullUrl(product.imageSource),
+        url: urlValue,
+        category: product.promotionTitle,
         starts_at: null,
         ends_at: endsAt,
-      };
-    });
+      });
+    }
+
+    return finalProducts;
   });
 }
 
-function parsePrice(raw) {
-  if (!raw) return null;
-  const cleaned = raw.replace(",", ".").replace(/[^\d.]/g, "");
-  const num = parseFloat(cleaned);
-  return isNaN(num) ? null : num;
+function parsePrice(rawValue) {
+  if (!rawValue) {
+    return null;
+  }
+  const cleanedString = rawValue.replace(",", ".").replace(/[^\d.]/g, "");
+  const parsedNumber = parseFloat(cleanedString);
+  if (isNaN(parsedNumber)) {
+    return null;
+  } else {
+    return parsedNumber;
+  }
 }
 
-function calcDiscount(oldPrice, newPrice) {
-  if (!oldPrice || !newPrice || oldPrice <= newPrice) return null;
+function calculateDiscount(oldPrice, newPrice) {
+  if (!oldPrice) {
+    return null;
+  }
+  if (!newPrice) {
+    return null;
+  }
+  if (oldPrice <= newPrice) {
+    return null;
+  }
   return Math.round(((oldPrice - newPrice) / oldPrice) * 100);
 }
 
-function makeFullUrl(src) {
-  if (!src) return null;
-  if (src.startsWith("http")) return src;
-  return ATB_BASE + src;
+function makeFullUrl(sourceUrl) {
+  if (!sourceUrl) {
+    return null;
+  }
+  if (sourceUrl.startsWith("http")) {
+    return sourceUrl;
+  }
+  return ATB_BASE_URL + sourceUrl;
 }
 
-function parseEndDate(raw) {
-  if (!raw) return null;
-  const date = new Date(raw);
-  if (isNaN(date.getTime())) return null;
-  return date.toISOString().split("T")[0];
+function parseEndDate(rawValue) {
+  if (!rawValue) {
+    return null;
+  }
+  const dateObject = new Date(rawValue);
+  if (isNaN(dateObject.getTime())) {
+    return null;
+  }
+  const isoString = dateObject.toISOString();
+  const dateParts = isoString.split("T");
+  return dateParts[0];
 }
 
-module.exports = { scrape };
+module.exports = { scrape: scrape };

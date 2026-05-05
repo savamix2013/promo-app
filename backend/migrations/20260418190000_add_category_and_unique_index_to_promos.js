@@ -1,15 +1,15 @@
-exports.up = async function (knex) {
-  await knex.schema.alterTable("promos", (table) => {
+exports.up = async function (database) {
+  await database.schema.alterTable("promos", function (table) {
     table.string("category").nullable();
   });
 
-  await knex.schema.alterTable("promos", (table) => {
+  await database.schema.alterTable("promos", function (table) {
     table.unique(["title", "store"]);
   });
 };
 
-exports.down = async function (knex) {
-  await knex.schema.alterTable("promos", (table) => {
+exports.down = async function (database) {
+  await database.schema.alterTable("promos", function (table) {
     table.dropUnique(["title", "store"]);
     table.dropColumn("category");
   });

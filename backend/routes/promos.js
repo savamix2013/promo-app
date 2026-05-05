@@ -1,18 +1,19 @@
 const express = require("express");
-const knex = require("../db");
-const checkAuth = require("../middleware/auth");
-const { runScraper } = require("../services/scraper-service");
+const database = require("../db");
+const checkAuthentication = require("../middleware/auth");
+const scraperService = require("../services/scraper-service");
+const runScraper = scraperService.runScraper;
 const atbScraper = require("../scrapers/atb");
 
 const router = express.Router();
 
-router.get("/", async (req, res) => {
+router.get("/", async function (req, res) {
   try {
     const store = req.query.store;
     const category = req.query.category;
     const search = req.query.search;
-    
-    const query = knex("promos").orderBy("discount_percent", "desc");
+
+    const query = database("promos").orderBy("discount_percent", "desc");
 
     if (store) {
       query.where("store", store);
@@ -21,21 +22,21 @@ router.get("/", async (req, res) => {
     if (category) {
       query.where("category", category);
     }
-    
+
     if (search) {
       query.where("title", "like", "%" + search + "%");
     }
-    
-    const promos = await query;
-    res.json({ success: true, data: promos });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
+
+    const promotions = await query;
+    res.json({ success: true, data: promotions });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
-router.post("/", checkAuth, async (req, res) => {
+router.post("/", checkAuthentication, async function (req, res) {
   try {
-    const data = {
+    const promotionData = {
       title: req.body.title,
       store: req.body.store,
       old_price: req.body.old_price,
@@ -47,69 +48,84 @@ router.post("/", checkAuth, async (req, res) => {
       starts_at: req.body.starts_at,
       ends_at: req.body.ends_at,
     };
-    const ids = await knex("promos").insert(data);
-    const promo = await knex("promos").where("id", ids[0]).first();
-    res.status(201).json({ success: true, data: promo });
-  } catch (error) {
-    res.status(400).json({ error: error.message });
+    const insertedIds = await database("promos").insert(promotionData);
+    const newPromotionId = insertedIds[0];
+    const promotion = await database("promos").where("id", newPromotionId).first();
+    res.status(201).json({ success: true, data: promotion });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
   }
 });
 
-router.post("/scrape/:store", checkAuth, async (req, res) => {
+router.post("/scrape/:store", checkAuthentication, async function (req, res) {
   if (req.user.role !== "admin") {
     return res.status(403).json({ error: "Лише для адміністраторів" });
   }
-  let scrapeFn;
-  const store = req.params.store.toLowerCase();
-  if (store === "atb") {
-    scrapeFn = atbScraper.scrape;
+
+  let scrapeFunction;
+  const storeName = req.params.store.toLowerCase();
+
+  if (storeName === "atb") {
+    scrapeFunction = atbScraper.scrape;
   } else {
     return res.status(400).json({ error: "Магазин не підтримується" });
   }
+
   try {
-    const stats = await runScraper(scrapeFn);
-    const status = stats.errors.length > 0 ? 207 : 200;
-    res.status(status).json({ success: true, data: stats });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    const statistics = await runScraper(scrapeFunction);
+    let status;
+    if (statistics.errors.length > 0) {
+      status = 207;
+    } else {
+      status = 200;
+    }
+    res.status(status).json({ success: true, data: statistics });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
-router.get("/stores", async (req, res) => {
+router.get("/stores", async function (req, res) {
   try {
-    const rows = await knex("promos").distinct("store");
-    const stores = rows.map(row => row.store);
+    const rows = await database("promos").distinct("store");
+    const stores =[];
+    for (let i = 0; i < rows.length; i++) {
+      stores.push(rows[i].store);
+    }
     res.json({ success: true, data: stores });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
-router.get("/categories", async (req, res) => {
+router.get("/categories", async function (req, res) {
   try {
-    const rows = await knex("promos").distinct("category").whereNotNull("category");
-    const categories = rows.map((row) => row.category);
+    const rows = await database("promos").distinct("category").whereNotNull("category");
+    const categories =[];
+    for (let i = 0; i < rows.length; i++) {
+      categories.push(rows[i].category);
+    }
     res.json({ success: true, data: categories });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
-router.get("/:id", async (req, res) => {
+router.get("/:id", async function (req, res) {
   try {
-    const promo = await knex("promos").where({ id: req.params.id }).first();
-    if (!promo) {
+    const promotion = await database("promos").where({ id: req.params.id }).first();
+    if (!promotion) {
       return res.status(404).json({ error: "Акцію не знайдено" });
     }
-    res.json({ success: true, data: promo });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.json({ success: true, data: promotion });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
-router.put("/:id", checkAuth, async (req, res) => {
+router.put("/:id", checkAuthentication, async function (req, res) {
   try {
-    const data = {
+    const updateData = {
       title: req.body.title,
       store: req.body.store,
       old_price: req.body.old_price,
@@ -121,26 +137,26 @@ router.put("/:id", checkAuth, async (req, res) => {
       starts_at: req.body.starts_at,
       ends_at: req.body.ends_at,
     };
-    const count = await knex("promos").where({ id: req.params.id }).update(data);
-    if (count === 0) {
+    const updatedCount = await database("promos").where({ id: req.params.id }).update(updateData);
+    if (updatedCount === 0) {
       return res.status(404).json({ error: "Акцію не знайдено" });
     }
-    const promo = await knex("promos").where({ id: req.params.id }).first();
-    res.json({ success: true, data: promo });
-  } catch (error) {
-    res.status(400).json({ error: error.message });
+    const promotion = await database("promos").where({ id: req.params.id }).first();
+    res.json({ success: true, data: promotion });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
   }
 });
 
-router.delete("/:id", checkAuth, async (req, res) => {
+router.delete("/:id", checkAuthentication, async function (req, res) {
   try {
-    const count = await knex("promos").where({ id: req.params.id }).del();
-    if (count === 0) {
+    const deletedCount = await database("promos").where({ id: req.params.id }).del();
+    if (deletedCount === 0) {
       return res.status(404).json({ error: "Акцію не знайдено" });
     }
     res.json({ success: true });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
