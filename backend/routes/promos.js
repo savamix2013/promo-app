@@ -14,22 +14,61 @@ router.get("/", async function (req, res) {
     const category = req.query.category;
     const search = req.query.search;
 
-    const query = database("promos").orderBy("discount_percent", "desc");
+    let currentPage = parseInt(req.query.page, 10);
+    if (isNaN(currentPage) || currentPage < 1) {
+      currentPage = 1;
+    }
 
+    let itemsPerPage = parseInt(req.query.limit, 10);
+    if (isNaN(itemsPerPage) || itemsPerPage < 1) {
+      itemsPerPage = 50;
+    }
+
+    const countQuery = database("promos");
     if (store) {
-      query.where("store", store);
+      countQuery.where("store", store);
     }
-
     if (category) {
-      query.where("category", category);
+      countQuery.where("category", category);
     }
-
     if (search) {
-      query.where("title", "like", "%" + search + "%");
+      countQuery.where("title", "like", "%" + search + "%");
+    }
+    const countResult = await countQuery.count("* as count");
+
+    let totalItems = parseInt(countResult[0].count, 10);
+    if (isNaN(totalItems)) {
+      totalItems = 0;
     }
 
-    const promotions = await query;
-    res.json({ success: true, data: promotions });
+    const totalPages = Math.ceil(totalItems / itemsPerPage);
+
+    const dataQuery = database("promos").orderBy("discount_percent", "desc");
+    if (store) {
+      dataQuery.where("store", store);
+    }
+    if (category) {
+      dataQuery.where("category", category);
+    }
+    if (search) {
+      dataQuery.where("title", "like", "%" + search + "%");
+    }
+
+    const offsetValue = (currentPage - 1) * itemsPerPage;
+    dataQuery.limit(itemsPerPage).offset(offsetValue);
+
+    const promotions = await dataQuery;
+
+    res.json({
+      success: true,
+      data: promotions,
+      pagination: {
+        total_items: totalItems,
+        total_pages: totalPages,
+        current_page: currentPage,
+        items_per_page: itemsPerPage
+      }
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
