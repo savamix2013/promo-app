@@ -4,6 +4,7 @@ const checkAuthentication = require("../middleware/auth");
 const scraperService = require("../services/scraper-service");
 const runScraper = scraperService.runScraper;
 const atbScraper = require("../scrapers/atb");
+const silpoScraper = require("../scrapers/silpo");
 
 const router = express.Router();
 
@@ -67,6 +68,8 @@ router.post("/scrape/:store", checkAuthentication, async function (req, res) {
 
   if (storeName === "atb") {
     scrapeFunction = atbScraper.scrape;
+  } else if (storeName === "silpo") {
+    scrapeFunction = silpoScraper.scrape;
   } else {
     return res.status(400).json({ error: "Магазин не підтримується" });
   }
@@ -88,7 +91,7 @@ router.post("/scrape/:store", checkAuthentication, async function (req, res) {
 router.get("/stores", async function (req, res) {
   try {
     const rows = await database("promos").distinct("store");
-    const stores =[];
+    const stores = [];
     for (let i = 0; i < rows.length; i++) {
       stores.push(rows[i].store);
     }
@@ -101,7 +104,7 @@ router.get("/stores", async function (req, res) {
 router.get("/categories", async function (req, res) {
   try {
     const rows = await database("promos").distinct("category").whereNotNull("category");
-    const categories =[];
+    const categories = [];
     for (let i = 0; i < rows.length; i++) {
       categories.push(rows[i].category);
     }
