@@ -1,16 +1,27 @@
 const https = require("https");
 const baseScraper = require("./base");
 const withRetry = baseScraper.withRetry;
+const zlib = require("zlib");
 
 const SILPO_BASE_URL = "https://silpo.ua";
 const SILPO_API_BASE_URL = "https://sf-ecom-api.silpo.ua";
 const DEFAULT_BRANCH_ID = "00000000-0000-0000-0000-000000000000";
 const IMAGE_BASE_URL = "https://content.silpo.ua/ecom/product";
-const PRODUCTS_PER_PAGE = 100;
+const PRODUCTS_PER_PAGE = 500;
 const DELAY_MILLISECONDS = 1000;
 const REQUEST_TIMEOUT_MILLISECONDS = 30000;
 const USER_AGENT_STRING = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 const HASH_SLUG_LENGTH = 32;
+const CONCURRENCY_LIMIT = 3;
+
+const httpsAgent = new https.Agent({
+  keepAlive: true,
+  keepAliveMsecs: 30000,
+  maxSockets: 3,
+  maxFreeSockets: 2,
+  timeout: REQUEST_TIMEOUT_MILLISECONDS,
+});
+
 
 function makeApiRequest(requestUrl) {
   return new Promise(function (resolve, reject) {
@@ -19,44 +30,87 @@ function makeApiRequest(requestUrl) {
       hostname: parsedUrl.hostname,
       path: parsedUrl.pathname + parsedUrl.search,
       method: "GET",
+      agent: httpsAgent,
       headers: {
         "User-Agent": USER_AGENT_STRING,
-        "Accept": "application/json"
-      }
+        "Accept": "application/json",
+        "Accept-Encoding": "gzip, deflate",
+      },
     };
     const request = https.get(requestOptions, function (response) {
+      if (response.statusCode === 429) {
+        reject(new Error("Обмеження запитів: 429"));
+        response.resume();
+        return;
+      }
       if (response.statusCode !== 200) {
         reject(new Error("API повернув статус " + response.statusCode));
         response.resume();
         return;
       }
+
+      let responseStream = response;
+      const encoding = response.headers["content-encoding"];
+
+      if (encoding === "gzip") {
+        responseStream = response.pipe(zlib.createGunzip());
+      } else if (encoding === "deflate") {
+        responseStream = response.pipe(zlib.createInflate());
+      }
+
       let responseBody = "";
-      response.on("data", function (chunk) {
-        responseBody = responseBody + chunk;
+      responseStream.on("data", function (chunk) {
+        responseBody = responseBody + chunk.toString("utf8");
       });
-      response.on("end", function () {
+
+      responseStream.on("end", function () {
         try {
           const parsedData = JSON.parse(responseBody);
           resolve(parsedData);
         } catch (error) {
-          reject(error);
+          reject(new Error("Помилка парсингу JSON: " + error.message));
         }
       });
     });
+
     request.on("error", function (error) {
       reject(error);
     });
+
     request.setTimeout(REQUEST_TIMEOUT_MILLISECONDS, function () {
       request.destroy(new Error("Час запиту вичерпано"));
     });
   });
 }
 
+async function makeApiRequestWithBackoff(requestUrl, maximumRetries) {
+  if (maximumRetries === null || maximumRetries === undefined) {
+    maximumRetries = 3;
+  }
+  let lastError;
+  for (let attempt = 0; attempt < maximumRetries; attempt++) {
+    try {
+      return await makeApiRequest(requestUrl);
+    } catch (err) {
+      lastError = err;
+      if (err.message.indexOf("429") === -1) {
+        throw err;
+      }
+      const baseDelay = Math.pow(2, attempt) * 1000;
+      const jitter = Math.floor(Math.random() * 500);
+      const totalDelay = baseDelay + jitter;
+      console.warn("Обмеження запитів, пауза " + totalDelay + "мс (спроба " + (attempt + 1) + ")");
+      await new Promise(function (resolve) {
+        setTimeout(resolve, totalDelay);
+      });
+    }
+  }
+  throw lastError;
+}
+
 async function fetchCategoriesTree() {
-  const requestUrl = SILPO_API_BASE_URL
-    + "/v1/branches/" + DEFAULT_BRANCH_ID
-    + "/categories/tree?deliveryType=DeliveryHome";
-  const responseData = await makeApiRequest(requestUrl);
+  const requestUrl = SILPO_API_BASE_URL + "/v1/branches/" + DEFAULT_BRANCH_ID + "/categories/tree?deliveryType=DeliveryHome";
+  const responseData = await makeApiRequestWithBackoff(requestUrl);
   return responseData;
 }
 
@@ -81,29 +135,21 @@ function collectTopLevelCategories(categoriesData) {
     } else {
       categoryName = item.slug;
     }
-    const categoryEntry = {
+    topLevelCategories.push({
       slug: item.slug,
-      title: categoryName
-    };
-    topLevelCategories.push(categoryEntry);
+      title: categoryName,
+    });
   }
   return topLevelCategories;
 }
 
 function buildProductsUrl(categorySlug, offset) {
-  return SILPO_API_BASE_URL
-    + "/v1/uk/branches/" + DEFAULT_BRANCH_ID
-    + "/products?limit=" + PRODUCTS_PER_PAGE
-    + "&offset=" + offset
-    + "&deliveryType=DeliveryHome"
-    + "&category=" + categorySlug
-    + "&includeChildCategories=true"
-    + "&inStock=true";
+  return SILPO_API_BASE_URL + "/v1/uk/branches/" + DEFAULT_BRANCH_ID + "/products?limit=" + PRODUCTS_PER_PAGE + "&offset=" + offset + "&deliveryType=DeliveryHome&category=" + categorySlug + "&includeChildCategories=true&inStock=true";
 }
 
 async function fetchProductsPage(categorySlug, offset) {
   const requestUrl = buildProductsUrl(categorySlug, offset);
-  const responseData = await makeApiRequest(requestUrl);
+  const responseData = await makeApiRequestWithBackoff(requestUrl);
   return responseData;
 }
 
@@ -117,7 +163,7 @@ async function fetchAllProductsForCategory(categorySlug, categoryTitle) {
   });
 
   if (!firstPageData) {
-    console.warn("Немає відповіді для категорії: " + categoryTitle);
+    console.warn("Категорія " + categoryTitle + " не відповідає");
     return [];
   }
 
@@ -154,7 +200,7 @@ async function fetchAllProductsForCategory(categorySlug, categoryTitle) {
 
       currentOffset = currentOffset + PRODUCTS_PER_PAGE;
     } catch (error) {
-      console.warn("Помилка завантаження зміщення " + currentOffset + " для " + categoryTitle + ": " + error.message);
+      console.warn("Зміщення " + currentOffset + " для " + categoryTitle + " не завантажилось: " + error.message);
       break;
     }
   }
@@ -204,40 +250,51 @@ function makeProductUrl(productSlug) {
 }
 
 async function scrape() {
-  console.log("Завантаження всіх товарів з API Сільпо");
+  console.log("Завантаження товарів з API Сільпо");
 
   let categoriesData;
   try {
     categoriesData = await fetchCategoriesTree();
   } catch (error) {
-    console.warn("Не вдалося завантажити дерево категорій: " + error.message);
+    console.warn("Дерево категорій не завантажилось: " + error.message);
     return [];
   }
 
   const topLevelCategories = collectTopLevelCategories(categoriesData);
   console.log("Знайдено " + topLevelCategories.length + " категорій верхнього рівня");
 
-  let allProducts = [];
+  const allProducts = [];
+  let nextCategoryIndex = 0;
 
-  for (let i = 0; i < topLevelCategories.length; i++) {
-    const category = topLevelCategories[i];
-    console.log("Скрапінг категорії (" + (i + 1) + "/" + topLevelCategories.length + "): " + category.title);
+  async function processCategoryWorker() {
+    while (nextCategoryIndex < topLevelCategories.length) {
+      const index = nextCategoryIndex++;
+      const category = topLevelCategories[index];
+      console.log("Обробка категорії (" + (index + 1) + "/" + topLevelCategories.length + "): " + category.title);
 
-    try {
-      const products = await fetchAllProductsForCategory(category.slug, category.title);
-      for (let j = 0; j < products.length; j++) {
-        products[j]._categoryTitle = category.title;
+      try {
+        const products = await fetchAllProductsForCategory(category.slug, category.title);
+        for (let j = 0; j < products.length; j++) {
+          products[j]._categoryTitle = category.title;
+          allProducts.push(products[j]);
+        }
+        console.log(products.length + " товарів у " + category.title);
+      } catch (error) {
+        console.warn("Помилка обробки категорії " + category.title + ": " + error.message);
       }
-      allProducts = allProducts.concat(products);
-      console.log(products.length + " товарів у " + category.title);
-    } catch (error) {
-      console.warn("Помилка скрапінгу " + category.title + ": " + error.message);
-    }
 
-    await new Promise(function (resolve) {
-      setTimeout(resolve, DELAY_MILLISECONDS);
-    });
+      await new Promise(function (resolve) {
+        setTimeout(resolve, DELAY_MILLISECONDS);
+      });
+    }
   }
+
+  const workerCount = Math.min(CONCURRENCY_LIMIT, topLevelCategories.length);
+  const workers = [];
+  for (let i = 0; i < workerCount; i++) {
+    workers.push(processCategoryWorker());
+  }
+  await Promise.all(workers);
 
   console.log("Зібрано " + allProducts.length + " товарів загалом");
 

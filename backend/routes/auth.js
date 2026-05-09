@@ -2,11 +2,14 @@ const express = require("express");
 const bcrypt = require("bcrypt");
 const jsonWebToken = require("jsonwebtoken");
 const checkAuthentication = require("../middleware/auth");
+const validateRegistration = require("../middleware/validate").validateRegistration;
+const validateLogin = require("../middleware/validate").validateLogin;
+const validatePasswordChange = require("../middleware/validate").validatePasswordChange;
 const database = require("../db");
 
 const router = express.Router();
 
-router.post("/register", async function (req, res) {
+router.post("/register", validateRegistration, async function (req, res) {
   try {
     const name = req.body.name;
     const email = req.body.email;
@@ -40,11 +43,12 @@ router.post("/register", async function (req, res) {
       },
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: "Внутрішня помилка сервера" });
   }
 });
 
-router.post("/login", async function (req, res) {
+router.post("/login", validateLogin, async function (req, res) {
   try {
     const email = req.body.email;
     const password = req.body.password;
@@ -67,7 +71,8 @@ router.post("/login", async function (req, res) {
 
     res.json({ success: true, token: token });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: "Внутрішня помилка сервера" });
   }
 });
 
@@ -89,7 +94,8 @@ router.get("/me", checkAuthentication, async function (req, res) {
       },
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: "Внутрішня помилка сервера" });
   }
 });
 
@@ -99,6 +105,10 @@ router.put("/profile", checkAuthentication, async function (req, res) {
     const email = req.body.email;
 
     if (email) {
+      if (email.indexOf("@") === -1 || email.indexOf(".") === -1) {
+        return res.status(400).json({ error: "Невірний формат пошти" });
+      }
+
       const existingUser = await database("users")
         .where({ email: email })
         .whereNot({ id: req.user.id })
@@ -129,11 +139,12 @@ router.put("/profile", checkAuthentication, async function (req, res) {
       },
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: "Внутрішня помилка сервера" });
   }
 });
 
-router.put("/password", checkAuthentication, async function (req, res) {
+router.put("/password", checkAuthentication, validatePasswordChange, async function (req, res) {
   try {
     const oldPassword = req.body.old_password;
     const newPassword = req.body.new_password;
@@ -150,7 +161,8 @@ router.put("/password", checkAuthentication, async function (req, res) {
     await database("users").where({ id: req.user.id }).update({ password_hash: hash });
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: "Внутрішня помилка сервера" });
   }
 });
 
@@ -159,7 +171,8 @@ router.delete("/account", checkAuthentication, async function (req, res) {
     await database("users").where({ id: req.user.id }).del();
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: "Внутрішня помилка сервера" });
   }
 });
 

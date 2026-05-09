@@ -66,11 +66,12 @@ router.get("/", async function (req, res) {
         total_items: totalItems,
         total_pages: totalPages,
         current_page: currentPage,
-        items_per_page: itemsPerPage
-      }
+        items_per_page: itemsPerPage,
+      },
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: "Внутрішня помилка сервера" });
   }
 });
 
@@ -93,7 +94,8 @@ router.post("/", checkAuthentication, async function (req, res) {
     const promotion = await database("promos").where("id", newPromotionId).first();
     res.status(201).json({ success: true, data: promotion });
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    console.error(err);
+    res.status(400).json({ error: "Не вдалося створити акцію" });
   }
 });
 
@@ -123,7 +125,8 @@ router.post("/scrape/:store", checkAuthentication, async function (req, res) {
     }
     res.status(status).json({ success: true, data: statistics });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error(err);
+    res.status(500).json({ error: "Внутрішня помилка сервера" });
   }
 });
 
@@ -136,7 +139,8 @@ router.get("/stores", async function (req, res) {
     }
     res.json({ success: true, data: stores });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: "Внутрішня помилка сервера" });
   }
 });
 
@@ -149,7 +153,8 @@ router.get("/categories", async function (req, res) {
     }
     res.json({ success: true, data: categories });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: "Внутрішня помилка сервера" });
   }
 });
 
@@ -161,7 +166,8 @@ router.get("/:id", async function (req, res) {
     }
     res.json({ success: true, data: promotion });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: "Внутрішня помилка сервера" });
   }
 });
 
@@ -186,7 +192,8 @@ router.put("/:id", checkAuthentication, async function (req, res) {
     const promotion = await database("promos").where({ id: req.params.id }).first();
     res.json({ success: true, data: promotion });
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    console.error(err);
+    res.status(400).json({ error: "Не вдалося оновити акцію" });
   }
 });
 
@@ -198,7 +205,8 @@ router.delete("/:id", checkAuthentication, async function (req, res) {
     }
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: "Внутрішня помилка сервера" });
   }
 });
 

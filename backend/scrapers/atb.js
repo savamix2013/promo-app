@@ -12,7 +12,7 @@ async function scrapePromotionList(page) {
   await page.waitForSelector(".actions-list__item", { timeout: 15000 });
 
   const promotions = await page.$$eval(".actions-list__item", function (items) {
-    const resultList =[];
+    const resultList = [];
     for (let i = 0; i < items.length; i++) {
       const element = items[i];
       const linkElement = element.querySelector("a.actions-list__img");
@@ -40,7 +40,7 @@ async function scrapePromotionList(page) {
     return resultList;
   });
 
-  const filteredPromotions =[];
+  const filteredPromotions = [];
   for (let i = 0; i < promotions.length; i++) {
     if (promotions[i].path) {
       filteredPromotions.push(promotions[i]);
@@ -57,7 +57,7 @@ async function waitForCloudflare(page) {
     }
   }
 
-  console.warn("Cloudflare заблокував, чекаємо");
+  console.warn("Cloudflare заблокував доступ, очікування");
 
   for (let i = 0; i < 15; i++) {
     await new Promise(function (resolve) {
@@ -82,7 +82,7 @@ async function scrapePromotionProducts(page, promotionPath, promotionTitle) {
   const passedCloudflare = await waitForCloudflare(page);
   if (!passedCloudflare) {
     console.warn("Cloudflare не пустив: " + fullUrl);
-    return[];
+    return [];
   }
 
   let hasProducts;
@@ -95,7 +95,7 @@ async function scrapePromotionProducts(page, promotionPath, promotionTitle) {
 
   if (!hasProducts) {
     console.warn("Немає товарів в акції: " + promotionTitle);
-    return[];
+    return [];
   }
 
   let endDateValue;
@@ -108,7 +108,7 @@ async function scrapePromotionProducts(page, promotionPath, promotionTitle) {
   }
 
   const products = await page.$$eval("article.catalog-item", function (items) {
-    const resultList =[];
+    const resultList = [];
     for (let i = 0; i < items.length; i++) {
       const element = items[i];
       const titleElement = element.querySelector(".catalog-item__title a");
@@ -158,7 +158,7 @@ async function scrapePromotionProducts(page, promotionPath, promotionTitle) {
     return resultList;
   });
 
-  const productsWithPromotionData =[];
+  const productsWithPromotionData = [];
   for (let i = 0; i < products.length; i++) {
     const product = products[i];
     product.promotionTitle = promotionTitle;
@@ -177,28 +177,31 @@ async function scrape() {
     });
     console.log("Знайдено " + promotions.length + " акцій");
 
-    let allProducts =[];
+    const allProducts = [];
 
     for (let i = 0; i < promotions.length; i++) {
       const promotion = promotions[i];
-      console.log("Збираємо товари: " + promotion.title);
+      console.log("Збір товарів: " + promotion.title);
 
       try {
         const products = await withRetry(async function () {
           return await scrapePromotionProducts(page, promotion.path, promotion.title);
         }, 2);
-        allProducts = allProducts.concat(products);
+        for (let j = 0; j < products.length; j++) {
+          allProducts.push(products[j]);
+        }
         console.log(products.length + " товарів");
       } catch (err) {
         console.warn("Помилка: " + err.message);
       }
 
+      await page.goto("about:blank");
       await new Promise(function (resolve) {
         setTimeout(resolve, DELAY_MILLISECONDS);
       });
     }
 
-    const validProducts =[];
+    const validProducts = [];
     for (let i = 0; i < allProducts.length; i++) {
       const product = allProducts[i];
       if (product.name) {
@@ -209,7 +212,7 @@ async function scrape() {
     }
 
     const seenProducts = {};
-    const uniqueProducts =[];
+    const uniqueProducts = [];
     for (let i = 0; i < validProducts.length; i++) {
       const product = validProducts[i];
       if (!seenProducts[product.name]) {
@@ -220,7 +223,7 @@ async function scrape() {
 
     console.log("Всього валідних: " + validProducts.length + ", унікальних: " + uniqueProducts.length);
 
-    const finalProducts =[];
+    const finalProducts = [];
     for (let i = 0; i < uniqueProducts.length; i++) {
       const product = uniqueProducts[i];
       const newPrice = parsePrice(product.newPriceRaw);
