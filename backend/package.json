@@ -3,7 +3,8 @@
   "main": "app.js",
   "scripts": {
     "start": "./node_modules/.bin/knex migrate:latest && node app.js",
-    "scrape": "node scrape.js"
+    "scrape": "node scrape.js",
+    "test": "node tests/api.js"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",
