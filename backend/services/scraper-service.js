@@ -5,78 +5,82 @@ async function runScraper(scrapeFunction) {
     inserted: 0,
     updated: 0,
     skipped: 0,
-    errors:[]
+    errors: [],
   };
 
   let products;
   try {
     products = await scrapeFunction();
   } catch (err) {
-    statistics.errors.push("Помилка: " + err.message);
+    statistics.errors.push("Помилка скрейпінгу: " + err.message);
     return statistics;
   }
 
   if (products.length === 0) {
-    statistics.errors.push("Товарів не знайдено - сайт недоступний або змінилась структура");
+    statistics.errors.push("Товарів не знайдено, сайт недоступний або змінилась структура");
     return statistics;
   }
 
-  console.log("Зібрано " + products.length + " товарів, зберігаємо");
+  console.log("Зібрано " + products.length + " товарів, збереження в транзакції");
 
-  for (let i = 0; i < products.length; i++) {
-    const product = products[i];
-    try {
-      await upsertProduct(product, statistics);
-    } catch (err) {
-      statistics.errors.push("Не вдалося зберегти \"" + product.title + "\": " + err.message);
+  const storeName = products[0].store;
+
+  await database.transaction(async function (trx) {
+    const existingRows = await trx("promos")
+      .where({ store: storeName })
+      .select("title", "new_price", "old_price");
+
+    const existingMap = {};
+    for (let i = 0; i < existingRows.length; i++) {
+      existingMap[existingRows[i].title] = existingRows[i];
     }
-  }
+
+    for (let i = 0; i < products.length; i++) {
+      const product = products[i];
+      try {
+        await trx.raw(
+          "INSERT INTO promos (title, store, old_price, new_price, discount_percent, image_url, url, category, starts_at, ends_at) " +
+          "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) " +
+          "ON CONFLICT(title, store) DO UPDATE SET " +
+          "old_price = excluded.old_price, " +
+          "new_price = excluded.new_price, " +
+          "discount_percent = excluded.discount_percent, " +
+          "image_url = excluded.image_url, " +
+          "url = excluded.url, " +
+          "category = excluded.category, " +
+          "starts_at = excluded.starts_at, " +
+          "ends_at = excluded.ends_at, " +
+          "updated_at = datetime('now')",
+          [
+            product.title,
+            product.store,
+            product.old_price,
+            product.new_price,
+            product.discount_percent,
+            product.image_url,
+            product.url,
+            product.category,
+            product.starts_at,
+            product.ends_at,
+          ]
+        );
+
+        const existing = existingMap[product.title];
+        if (!existing) {
+          statistics.inserted++;
+        } else if (existing.new_price !== product.new_price || existing.old_price !== product.old_price) {
+          statistics.updated++;
+        } else {
+          statistics.skipped++;
+        }
+      } catch (err) {
+        statistics.errors.push("Не вдалося зберегти \"" + product.title + "\": " + err.message);
+      }
+    }
+  });
 
   console.log("Вставлено " + statistics.inserted + ", оновлено " + statistics.updated + ", пропущено " + statistics.skipped);
   return statistics;
-}
-
-async function upsertProduct(product, statistics) {
-  const existingProduct = await database("promos")
-    .where({ title: product.title, store: product.store })
-    .first();
-
-  if (!existingProduct) {
-    await database("promos").insert(product);
-    statistics.inserted++;
-    return;
-  }
-
-  let priceChanged;
-  if (existingProduct.new_price !== product.new_price) {
-    priceChanged = true;
-  } else if (existingProduct.old_price !== product.old_price) {
-    priceChanged = true;
-  } else {
-    priceChanged = false;
-  }
-
-  if (priceChanged) {
-    const updateData = {
-      title: product.title,
-      store: product.store,
-      old_price: product.old_price,
-      new_price: product.new_price,
-      discount_percent: product.discount_percent,
-      image_url: product.image_url,
-      url: product.url,
-      category: product.category,
-      starts_at: product.starts_at,
-      ends_at: product.ends_at,
-      updated_at: database.fn.now()
-    };
-    await database("promos")
-      .where({ id: existingProduct.id })
-      .update(updateData);
-    statistics.updated++;
-  } else {
-    statistics.skipped++;
-  }
 }
 
 module.exports = { runScraper: runScraper };
