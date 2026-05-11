@@ -23,8 +23,8 @@ async function executeScraping() {
     } else {
       process.exit(0);
     }
-  } catch (err) {
-    console.error("Помилка:", err);
+  } catch (error) {
+    console.error("Помилка:", error);
     process.exit(1);
   }
 }

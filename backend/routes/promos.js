@@ -8,18 +8,18 @@ const silpoScraper = require("../scrapers/silpo");
 
 const router = express.Router();
 
-router.get("/", async function (req, res) {
+router.get("/", async function (request, response) {
   try {
-    const store = req.query.store;
-    const category = req.query.category;
-    const search = req.query.search;
+    const store = request.query.store;
+    const category = request.query.category;
+    const search = request.query.search;
 
-    let currentPage = parseInt(req.query.page, 10);
+    let currentPage = parseInt(request.query.page, 10);
     if (isNaN(currentPage) || currentPage < 1) {
       currentPage = 1;
     }
 
-    let itemsPerPage = parseInt(req.query.limit, 10);
+    let itemsPerPage = parseInt(request.query.limit, 10);
     if (isNaN(itemsPerPage) || itemsPerPage < 1) {
       itemsPerPage = 50;
     }
@@ -59,7 +59,7 @@ router.get("/", async function (req, res) {
 
     const promotions = await dataQuery;
 
-    res.json({
+    response.json({
       success: true,
       data: promotions,
       pagination: {
@@ -69,50 +69,50 @@ router.get("/", async function (req, res) {
         items_per_page: itemsPerPage,
       },
     });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Внутрішня помилка сервера" });
+  } catch (error) {
+    console.error(error);
+    response.status(500).json({ error: "Внутрішня помилка сервера" });
   }
 });
 
-router.post("/", checkAuthentication, async function (req, res) {
+router.post("/", checkAuthentication, async function (request, response) {
   try {
     const promotionData = {
-      title: req.body.title,
-      store: req.body.store,
-      old_price: req.body.old_price,
-      new_price: req.body.new_price,
-      discount_percent: req.body.discount_percent,
-      image_url: req.body.image_url,
-      url: req.body.url,
-      category: req.body.category,
-      starts_at: req.body.starts_at,
-      ends_at: req.body.ends_at,
+      title: request.body.title,
+      store: request.body.store,
+      old_price: request.body.old_price,
+      new_price: request.body.new_price,
+      discount_percent: request.body.discount_percent,
+      image_url: request.body.image_url,
+      url: request.body.url,
+      category: request.body.category,
+      starts_at: request.body.starts_at,
+      ends_at: request.body.ends_at,
     };
     const insertedIds = await database("promos").insert(promotionData);
     const newPromotionId = insertedIds[0];
     const promotion = await database("promos").where("id", newPromotionId).first();
-    res.status(201).json({ success: true, data: promotion });
-  } catch (err) {
-    console.error(err);
-    res.status(400).json({ error: "Не вдалося створити акцію" });
+    response.status(201).json({ success: true, data: promotion });
+  } catch (error) {
+    console.error(error);
+    response.status(400).json({ error: "Не вдалося створити акцію" });
   }
 });
 
-router.post("/scrape/:store", checkAuthentication, async function (req, res) {
-  if (req.user.role !== "admin") {
-    return res.status(403).json({ error: "Лише для адміністраторів" });
+router.post("/scrape/:store", checkAuthentication, async function (request, response) {
+  if (request.user.role !== "admin") {
+    return response.status(403).json({ error: "Лише для адміністраторів" });
   }
 
   let scrapeFunction;
-  const storeName = req.params.store.toLowerCase();
+  const storeName = request.params.store.toLowerCase();
 
   if (storeName === "atb") {
     scrapeFunction = atbScraper.scrape;
   } else if (storeName === "silpo") {
     scrapeFunction = silpoScraper.scrape;
   } else {
-    return res.status(400).json({ error: "Магазин не підтримується" });
+    return response.status(400).json({ error: "Магазин не підтримується" });
   }
 
   try {
@@ -123,90 +123,90 @@ router.post("/scrape/:store", checkAuthentication, async function (req, res) {
     } else {
       status = 200;
     }
-    res.status(status).json({ success: true, data: statistics });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Внутрішня помилка сервера" });
+    response.status(status).json({ success: true, data: statistics });
+  } catch (error) {
+    console.error(error);
+    response.status(500).json({ error: "Внутрішня помилка сервера" });
   }
 });
 
-router.get("/stores", async function (req, res) {
+router.get("/stores", async function (request, response) {
   try {
     const rows = await database("promos").distinct("store");
     const stores = [];
     for (let i = 0; i < rows.length; i++) {
       stores.push(rows[i].store);
     }
-    res.json({ success: true, data: stores });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Внутрішня помилка сервера" });
+    response.json({ success: true, data: stores });
+  } catch (error) {
+    console.error(error);
+    response.status(500).json({ error: "Внутрішня помилка сервера" });
   }
 });
 
-router.get("/categories", async function (req, res) {
+router.get("/categories", async function (request, response) {
   try {
     const rows = await database("promos").distinct("category").whereNotNull("category");
     const categories = [];
     for (let i = 0; i < rows.length; i++) {
       categories.push(rows[i].category);
     }
-    res.json({ success: true, data: categories });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Внутрішня помилка сервера" });
+    response.json({ success: true, data: categories });
+  } catch (error) {
+    console.error(error);
+    response.status(500).json({ error: "Внутрішня помилка сервера" });
   }
 });
 
-router.get("/:id", async function (req, res) {
+router.get("/:id", async function (request, response) {
   try {
-    const promotion = await database("promos").where({ id: req.params.id }).first();
+    const promotion = await database("promos").where({ id: request.params.id }).first();
     if (!promotion) {
-      return res.status(404).json({ error: "Акцію не знайдено" });
+      return response.status(404).json({ error: "Акцію не знайдено" });
     }
-    res.json({ success: true, data: promotion });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Внутрішня помилка сервера" });
+    response.json({ success: true, data: promotion });
+  } catch (error) {
+    console.error(error);
+    response.status(500).json({ error: "Внутрішня помилка сервера" });
   }
 });
 
-router.put("/:id", checkAuthentication, async function (req, res) {
+router.put("/:id", checkAuthentication, async function (request, response) {
   try {
     const updateData = {
-      title: req.body.title,
-      store: req.body.store,
-      old_price: req.body.old_price,
-      new_price: req.body.new_price,
-      discount_percent: req.body.discount_percent,
-      image_url: req.body.image_url,
-      url: req.body.url,
-      category: req.body.category,
-      starts_at: req.body.starts_at,
-      ends_at: req.body.ends_at,
+      title: request.body.title,
+      store: request.body.store,
+      old_price: request.body.old_price,
+      new_price: request.body.new_price,
+      discount_percent: request.body.discount_percent,
+      image_url: request.body.image_url,
+      url: request.body.url,
+      category: request.body.category,
+      starts_at: request.body.starts_at,
+      ends_at: request.body.ends_at,
     };
-    const updatedCount = await database("promos").where({ id: req.params.id }).update(updateData);
+    const updatedCount = await database("promos").where({ id: request.params.id }).update(updateData);
     if (updatedCount === 0) {
-      return res.status(404).json({ error: "Акцію не знайдено" });
+      return response.status(404).json({ error: "Акцію не знайдено" });
     }
-    const promotion = await database("promos").where({ id: req.params.id }).first();
-    res.json({ success: true, data: promotion });
-  } catch (err) {
-    console.error(err);
-    res.status(400).json({ error: "Не вдалося оновити акцію" });
+    const promotion = await database("promos").where({ id: request.params.id }).first();
+    response.json({ success: true, data: promotion });
+  } catch (error) {
+    console.error(error);
+    response.status(400).json({ error: "Не вдалося оновити акцію" });
   }
 });
 
-router.delete("/:id", checkAuthentication, async function (req, res) {
+router.delete("/:id", checkAuthentication, async function (request, response) {
   try {
-    const deletedCount = await database("promos").where({ id: req.params.id }).del();
+    const deletedCount = await database("promos").where({ id: request.params.id }).del();
     if (deletedCount === 0) {
-      return res.status(404).json({ error: "Акцію не знайдено" });
+      return response.status(404).json({ error: "Акцію не знайдено" });
     }
-    res.json({ success: true });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Внутрішня помилка сервера" });
+    response.json({ success: true });
+  } catch (error) {
+    console.error(error);
+    response.status(500).json({ error: "Внутрішня помилка сервера" });
   }
 });
 
