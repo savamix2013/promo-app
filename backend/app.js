@@ -1,5 +1,8 @@
 require("dotenv").config();
 const express = require("express");
+const expressRateLimit = require("express-rate-limit");
+const helmet = require("helmet");
+const cors = require("cors");
 const checkAuthentication = require("./middleware/auth");
 const authenticationRoutes = require("./routes/auth");
 const promotionsRoutes = require("./routes/promos");
@@ -12,9 +15,22 @@ if (port === null || port === undefined) {
   port = 3111;
 }
 
-app.use(express.json());
+app.use(helmet({ contentSecurityPolicy: false }));
+app.use(cors());
+
+const apiLimiter = expressRateLimit({
+  windowMs: 900000,
+  max: 100,
+  message: { error: "Забагато запитів, спробуйте пізніше" },
+});
+
+app.use(express.json({ limit: "100kb" }));
 app.use(express.static(path.join(__dirname, "../frontend/dist")));
+
+app.use("/auth", apiLimiter);
 app.use("/auth", authenticationRoutes);
+
+app.use("/promos", apiLimiter);
 app.use("/promos", promotionsRoutes);
 
 app.get("/health", function (request, response) {
@@ -26,7 +42,6 @@ app.get("/users", checkAuthentication, async function (request, response) {
     const users = await database("users").select("id", "name", "email", "role");
     response.json({ success: true, data: users });
   } catch (error) {
-    console.error(error);
     response.status(500).json({ error: "Внутрішня помилка сервера" });
   }
 });
@@ -47,9 +62,13 @@ app.delete("/users/:id", checkAuthentication, async function (request, response)
     }
     response.json({ success: true });
   } catch (error) {
-    console.error(error);
     response.status(500).json({ error: "Внутрішня помилка сервера" });
   }
+});
+
+app.use(function (error, request, response, nextFunction) {
+  console.error("Unhandled error: " + error.message);
+  response.status(500).json({ error: "Внутрішня помилка сервера" });
 });
 
 const server = app.listen(port, function () {
@@ -68,7 +87,6 @@ function handleShutdown(signal) {
     process.exit(0);
   });
   setTimeout(function () {
-    console.error("Таймаут - примусове завершення");
     process.exit(1);
   }, 10000);
 }

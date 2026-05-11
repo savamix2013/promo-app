@@ -21,65 +21,82 @@ async function runScraper(scrapeFunction) {
     return statistics;
   }
 
-  console.log("Зібрано " + products.length + " товарів, збереження в транзакції");
-
   const storeName = products[0].store;
+  const chunkSize = 50;
 
-  await database.transaction(async function (transaction) {
-    const existingRows = await transaction("promos")
-      .where({ store: storeName })
-      .select("title", "new_price", "old_price");
-
-    const existingMap = {};
-    for (let i = 0; i < existingRows.length; i++) {
-      existingMap[existingRows[i].title] = existingRows[i];
-    }
-
-    for (let i = 0; i < products.length; i++) {
-      const product = products[i];
-      try {
-        await transaction.raw(
-          "INSERT INTO promos (title, store, old_price, new_price, discount_percent, image_url, url, category, starts_at, ends_at) " +
-          "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) " +
-          "ON CONFLICT(title, store) DO UPDATE SET " +
-          "old_price = excluded.old_price, " +
-          "new_price = excluded.new_price, " +
-          "discount_percent = excluded.discount_percent, " +
-          "image_url = excluded.image_url, " +
-          "url = excluded.url, " +
-          "category = excluded.category, " +
-          "starts_at = excluded.starts_at, " +
-          "ends_at = excluded.ends_at, " +
-          "updated_at = datetime('now')",
-          [
-            product.title,
-            product.store,
-            product.old_price,
-            product.new_price,
-            product.discount_percent,
-            product.image_url,
-            product.url,
-            product.category,
-            product.starts_at,
-            product.ends_at,
-          ]
-        );
-
-        const existing = existingMap[product.title];
-        if (!existing) {
-          statistics.inserted++;
-        } else if (existing.new_price !== product.new_price || existing.old_price !== product.old_price) {
-          statistics.updated++;
-        } else {
-          statistics.skipped++;
-        }
-      } catch (saveError) {
-        statistics.errors.push("Не вдалося зберегти \"" + product.title + "\": " + saveError.message);
+  for (let i = 0; i < products.length; i = i + chunkSize) {
+    const chunk = [];
+    for (let j = 0; j < chunkSize; j++) {
+      if (i + j < products.length) {
+        chunk.push(products[i + j]);
       }
     }
-  });
 
-  console.log("Вставлено " + statistics.inserted + ", оновлено " + statistics.updated + ", пропущено " + statistics.skipped);
+    try {
+      await database.transaction(async function (transaction) {
+        const chunkTitles = [];
+        for (let k = 0; k < chunk.length; k++) {
+          chunkTitles.push(chunk[k].title);
+        }
+
+        const existingRows = await transaction("promos")
+          .where({ store: storeName })
+          .whereIn("title", chunkTitles)
+          .select("title", "new_price", "old_price");
+
+        const existingMap = {};
+        for (let k = 0; k < existingRows.length; k++) {
+          existingMap[existingRows[k].title] = existingRows[k];
+        }
+
+        for (let k = 0; k < chunk.length; k++) {
+          const product = chunk[k];
+          try {
+            await transaction.raw(
+              "INSERT INTO promos (title, store, old_price, new_price, discount_percent, image_url, url, category, starts_at, ends_at) " +
+              "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) " +
+              "ON CONFLICT(title, store) DO UPDATE SET " +
+              "old_price = excluded.old_price, " +
+              "new_price = excluded.new_price, " +
+              "discount_percent = excluded.discount_percent, " +
+              "image_url = excluded.image_url, " +
+              "url = excluded.url, " +
+              "category = excluded.category, " +
+              "starts_at = excluded.starts_at, " +
+              "ends_at = excluded.ends_at, " +
+              "updated_at = datetime('now')",
+              [
+                product.title,
+                product.store,
+                product.old_price,
+                product.new_price,
+                product.discount_percent,
+                product.image_url,
+                product.url,
+                product.category,
+                product.starts_at,
+                product.ends_at,
+              ]
+            );
+
+            const existing = existingMap[product.title];
+            if (!existing) {
+              statistics.inserted++;
+            } else if (existing.new_price !== product.new_price || existing.old_price !== product.old_price) {
+              statistics.updated++;
+            } else {
+              statistics.skipped++;
+            }
+          } catch (saveError) {
+            statistics.errors.push("Не вдалося зберегти \"" + product.title + "\": " + saveError.message);
+          }
+        }
+      });
+    } catch (transactionError) {
+      statistics.errors.push("Помилка транзакції: " + transactionError.message);
+    }
+  }
+
   return statistics;
 }
 
