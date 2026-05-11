@@ -1,25 +1,25 @@
 const jsonWebToken = require("jsonwebtoken");
 
-function checkAuthentication(req, res, nextFunction) {
-  const authorizationHeader = req.headers.authorization;
+function checkAuthentication(request, response, nextFunction) {
+  const authorizationHeader = request.headers.authorization;
 
   if (!authorizationHeader) {
-    return res.status(401).json({ error: "Немає токена" });
+    return response.status(401).json({ error: "Немає токена" });
   }
 
   const tokenParts = authorizationHeader.split(" ");
   const token = tokenParts[1];
 
   if (!token) {
-    return res.status(401).json({ error: "Токен порожній" });
+    return response.status(401).json({ error: "Токен порожній" });
   }
 
   try {
     const decodedToken = jsonWebToken.verify(token, process.env.JWT_SECRET);
-    req.user = decodedToken;
+    request.user = decodedToken;
     nextFunction();
-  } catch (err) {
-    return res.status(401).json({ error: "Токен недійсний" });
+  } catch (error) {
+    return response.status(401).json({ error: "Токен недійсний" });
   }
 }
 

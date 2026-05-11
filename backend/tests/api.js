@@ -23,8 +23,8 @@ function makeRequest(method, requestPath, requestBody) {
         resolve({ statusCode: response.statusCode, body: responseBody });
       });
     });
-    request.on("error", function (error) {
-      reject(error);
+    request.on("error", function (requestError) {
+      reject(requestError);
     });
     if (requestBody) {
       request.write(JSON.stringify(requestBody));
@@ -47,8 +47,8 @@ async function runTests() {
       console.log("GET /health - статус " + result.statusCode);
       failed++;
     }
-  } catch (err) {
-    console.log("GET /health - " + err.message);
+  } catch (testError) {
+    console.log("GET /health - " + testError.message);
     failed++;
   }
 
@@ -62,8 +62,8 @@ async function runTests() {
       console.log("GET /promos - статус " + result.statusCode);
       failed++;
     }
-  } catch (err) {
-    console.log("GET /promos - " + err.message);
+  } catch (testError) {
+    console.log("GET /promos - " + testError.message);
     failed++;
   }
 
@@ -77,8 +77,8 @@ async function runTests() {
       console.log("GET /promos/stores - статус " + result.statusCode);
       failed++;
     }
-  } catch (err) {
-    console.log("GET /promos/stores - " + err.message);
+  } catch (testError) {
+    console.log("GET /promos/stores - " + testError.message);
     failed++;
   }
 
@@ -92,8 +92,8 @@ async function runTests() {
       console.log("GET /promos/categories - статус " + result.statusCode);
       failed++;
     }
-  } catch (err) {
-    console.log("GET /promos/categories - " + err.message);
+  } catch (testError) {
+    console.log("GET /promos/categories - " + testError.message);
     failed++;
   }
 
@@ -110,8 +110,8 @@ async function runTests() {
       console.log("POST /auth/register - очікувано 400, отримано " + result.statusCode);
       failed++;
     }
-  } catch (err) {
-    console.log("POST /auth/register - " + err.message);
+  } catch (testError) {
+    console.log("POST /auth/register - " + testError.message);
     failed++;
   }
 
@@ -127,8 +127,8 @@ async function runTests() {
       console.log("POST /auth/login - очікувано 400, отримано " + result.statusCode);
       failed++;
     }
-  } catch (err) {
-    console.log("POST /auth/login - " + err.message);
+  } catch (testError) {
+    console.log("POST /auth/login - " + testError.message);
     failed++;
   }
 
@@ -141,8 +141,8 @@ async function runTests() {
       console.log("GET /auth/me - очікувано 401, отримано " + result.statusCode);
       failed++;
     }
-  } catch (err) {
-    console.log("GET /auth/me - " + err.message);
+  } catch (testError) {
+    console.log("GET /auth/me - " + testError.message);
     failed++;
   }
 

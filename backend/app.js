@@ -17,38 +17,38 @@ app.use(express.static(path.join(__dirname, "../frontend/dist")));
 app.use("/auth", authenticationRoutes);
 app.use("/promos", promotionsRoutes);
 
-app.get("/health", function (req, res) {
-  res.json({ status: "ok", uptime: process.uptime(), timestamp: new Date().toISOString() });
+app.get("/health", function (request, response) {
+  response.json({ status: "ok", uptime: process.uptime(), timestamp: new Date().toISOString() });
 });
 
-app.get("/users", checkAuthentication, async function (req, res) {
+app.get("/users", checkAuthentication, async function (request, response) {
   try {
     const users = await database("users").select("id", "name", "email", "role");
-    res.json({ success: true, data: users });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Внутрішня помилка сервера" });
+    response.json({ success: true, data: users });
+  } catch (error) {
+    console.error(error);
+    response.status(500).json({ error: "Внутрішня помилка сервера" });
   }
 });
 
-app.delete("/users/:id", checkAuthentication, async function (req, res) {
+app.delete("/users/:id", checkAuthentication, async function (request, response) {
   try {
-    if (req.user.role !== "admin") {
-      return res.status(403).json({ error: "Лише для адміністраторів" });
+    if (request.user.role !== "admin") {
+      return response.status(403).json({ error: "Лише для адміністраторів" });
     }
 
-    if (Number(req.params.id) === req.user.id) {
-      return res.status(400).json({ error: "Не можна видалити себе" });
+    if (Number(request.params.id) === request.user.id) {
+      return response.status(400).json({ error: "Не можна видалити себе" });
     }
 
-    const deletedCount = await database("users").where({ id: req.params.id }).del();
+    const deletedCount = await database("users").where({ id: request.params.id }).del();
     if (deletedCount === 0) {
-      return res.status(404).json({ error: "Користувача не знайдено" });
+      return response.status(404).json({ error: "Користувача не знайдено" });
     }
-    res.json({ success: true });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Внутрішня помилка сервера" });
+    response.json({ success: true });
+  } catch (error) {
+    console.error(error);
+    response.status(500).json({ error: "Внутрішня помилка сервера" });
   }
 });
 

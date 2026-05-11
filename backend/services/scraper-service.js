@@ -11,8 +11,8 @@ async function runScraper(scrapeFunction) {
   let products;
   try {
     products = await scrapeFunction();
-  } catch (err) {
-    statistics.errors.push("Помилка скрейпінгу: " + err.message);
+  } catch (error) {
+    statistics.errors.push("Помилка скрейпінгу: " + error.message);
     return statistics;
   }
 
@@ -25,8 +25,8 @@ async function runScraper(scrapeFunction) {
 
   const storeName = products[0].store;
 
-  await database.transaction(async function (trx) {
-    const existingRows = await trx("promos")
+  await database.transaction(async function (transaction) {
+    const existingRows = await transaction("promos")
       .where({ store: storeName })
       .select("title", "new_price", "old_price");
 
@@ -38,7 +38,7 @@ async function runScraper(scrapeFunction) {
     for (let i = 0; i < products.length; i++) {
       const product = products[i];
       try {
-        await trx.raw(
+        await transaction.raw(
           "INSERT INTO promos (title, store, old_price, new_price, discount_percent, image_url, url, category, starts_at, ends_at) " +
           "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) " +
           "ON CONFLICT(title, store) DO UPDATE SET " +
@@ -73,8 +73,8 @@ async function runScraper(scrapeFunction) {
         } else {
           statistics.skipped++;
         }
-      } catch (err) {
-        statistics.errors.push("Не вдалося зберегти \"" + product.title + "\": " + err.message);
+      } catch (saveError) {
+        statistics.errors.push("Не вдалося зберегти \"" + product.title + "\": " + saveError.message);
       }
     }
   });

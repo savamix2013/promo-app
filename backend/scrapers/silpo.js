@@ -67,14 +67,14 @@ function makeApiRequest(requestUrl) {
         try {
           const parsedData = JSON.parse(responseBody);
           resolve(parsedData);
-        } catch (error) {
-          reject(new Error("Помилка парсингу JSON: " + error.message));
+        } catch (parseError) {
+          reject(new Error("Помилка парсингу JSON: " + parseError.message));
         }
       });
     });
 
-    request.on("error", function (error) {
-      reject(error);
+    request.on("error", function (requestError) {
+      reject(requestError);
     });
 
     request.setTimeout(REQUEST_TIMEOUT_MILLISECONDS, function () {
@@ -91,10 +91,10 @@ async function makeApiRequestWithBackoff(requestUrl, maximumRetries) {
   for (let attempt = 0; attempt < maximumRetries; attempt++) {
     try {
       return await makeApiRequest(requestUrl);
-    } catch (err) {
-      lastError = err;
-      if (err.message.indexOf("429") === -1) {
-        throw err;
+    } catch (error) {
+      lastError = error;
+      if (error.message.indexOf("429") === -1) {
+        throw error;
       }
       const baseDelay = Math.pow(2, attempt) * 1000;
       const jitter = Math.floor(Math.random() * 500);
@@ -199,8 +199,8 @@ async function fetchAllProductsForCategory(categorySlug, categoryTitle) {
       }
 
       currentOffset = currentOffset + PRODUCTS_PER_PAGE;
-    } catch (error) {
-      console.warn("Зміщення " + currentOffset + " для " + categoryTitle + " не завантажилось: " + error.message);
+    } catch (categoryError) {
+      console.warn("Зміщення " + currentOffset + " для " + categoryTitle + " не завантажилось: " + categoryError.message);
       break;
     }
   }
@@ -255,8 +255,8 @@ async function scrape() {
   let categoriesData;
   try {
     categoriesData = await fetchCategoriesTree();
-  } catch (error) {
-    console.warn("Дерево категорій не завантажилось: " + error.message);
+  } catch (fetchError) {
+    console.warn("Дерево категорій не завантажилось: " + fetchError.message);
     return [];
   }
 
@@ -279,8 +279,8 @@ async function scrape() {
           allProducts.push(products[j]);
         }
         console.log(products.length + " товарів у " + category.title);
-      } catch (error) {
-        console.warn("Помилка обробки категорії " + category.title + ": " + error.message);
+      } catch (processingError) {
+        console.warn("Помилка обробки категорії " + category.title + ": " + processingError.message);
       }
 
       await new Promise(function (resolve) {

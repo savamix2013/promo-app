@@ -89,7 +89,7 @@ async function scrapePromotionProducts(page, promotionPath, promotionTitle) {
   try {
     await page.waitForSelector("article.catalog-item", { timeout: 10000 });
     hasProducts = true;
-  } catch (err) {
+  } catch (error) {
     hasProducts = false;
   }
 
@@ -103,7 +103,7 @@ async function scrapePromotionProducts(page, promotionPath, promotionTitle) {
     endDateValue = await page.$eval(".actionsTimer[data-time]", function (element) {
       return element.getAttribute("data-time");
     });
-  } catch (err) {
+  } catch (error) {
     endDateValue = null;
   }
 
@@ -191,8 +191,8 @@ async function scrape() {
           allProducts.push(products[j]);
         }
         console.log(products.length + " товарів");
-      } catch (err) {
-        console.warn("Помилка: " + err.message);
+      } catch (error) {
+        console.warn("Помилка: " + error.message);
       }
 
       await page.goto("about:blank");

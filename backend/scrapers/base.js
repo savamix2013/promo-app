@@ -25,8 +25,8 @@ async function closeBrowserWithTimeout(browserInstance, timeoutMilliseconds) {
     try {
       await browserInstance.close();
       didClose = true;
-    } catch (err) {
-      console.warn("Помилка закриття браузера: " + err.message);
+    } catch (error) {
+      console.warn("Помилка закриття браузера: " + error.message);
     }
   }
 
@@ -42,7 +42,7 @@ async function closeBrowserWithTimeout(browserInstance, timeoutMilliseconds) {
     console.warn("Браузер не відповідає - відключення");
     try {
       browserInstance.disconnect();
-    } catch (err) {
+    } catch (error) {
     }
   }
 }
@@ -82,9 +82,9 @@ async function withRetry(functionToRun, maximumRetries) {
   for (let attempt = 1; attempt <= maximumRetries; attempt++) {
     try {
       return await functionToRun();
-    } catch (err) {
-      lastError = err;
-      console.warn("Спроба " + attempt + "/" + maximumRetries + " не вдалась: " + err.message);
+    } catch (error) {
+      lastError = error;
+      console.warn("Спроба " + attempt + "/" + maximumRetries + " не вдалась: " + error.message);
       if (attempt < maximumRetries) {
         const delayMilliseconds = Math.pow(2, attempt - 1) * 2000;
         await new Promise(function (resolve) {
