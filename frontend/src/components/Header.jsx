@@ -18,9 +18,6 @@ function Header() {
           <Link to="/profile" className="nav-link">
             Профіль
           </Link>
-          <Link to="/admin" className="nav-link">
-            Адмін
-          </Link>
         </nav>
       </div>
     </header>

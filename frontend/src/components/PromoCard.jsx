@@ -14,7 +14,20 @@ const PromoCard = ({ promo }) => {
 
   return (
     <div className="promo-card">
-      <img src={image_url} alt={title} className="promo-image" />
+      <div className="promo-image-container">
+        {discount_percent && (
+          <div className="promo-badge">-{discount_percent}%</div>
+        )}
+        
+        {image_url ? (
+          <img src={image_url} alt={title} className="promo-image" />
+        ) : (
+          <div className="promo-image placeholder">
+            Фото відсутнє
+          </div>
+        )}
+      </div>
+
       <div className="promo-details">
         <span className="promo-store">{store}</span>
         <h3 className="promo-title">{title}</h3>
@@ -23,8 +36,6 @@ const PromoCard = ({ promo }) => {
           <span className="old-price">{old_price} грн</span>
           <span className="new-price">{new_price} грн</span>
         </div>
-
-        <span className="discount">-{discount_percent}%</span>
 
         <a
           href={url}
